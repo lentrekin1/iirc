@@ -12,6 +12,7 @@ A simple chat room with server and client included
 ## todo
 
 * Add more funcunality (maybe)
+  * Easier server control (gui?)
   * Admin moderation 
   * Multiple chat rooms
   * More than just plain text messages
