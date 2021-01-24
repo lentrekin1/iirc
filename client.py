@@ -5,8 +5,10 @@ import pickle
 import threading
 import traceback
 import time
+import os
 
 testing = False
+cred_file = 'creds.txt'
 WINDOW_TITLE = 'bruh irc'
 WINDOW_SIZE = (500, 500)
 MAX_NICKNAME_LEN = 10
@@ -21,6 +23,7 @@ all_layouts = {'setup': [[sg.Text(WINDOW_TITLE, text_color='red', key='setup_tit
                          [sg.InputText(key='port')],
                          [sg.Text('Enter Your Nickname Below:', key='name_banner')],
                          [sg.InputText(key='name')],
+                         [sg.Checkbox('Save Connection Info', key='save')],
                          [sg.Button('Connect', key='connect')],
                          [sg.Text('', size=(WINDOW_SIZE[0], 10), key='setup_error')]],
 
@@ -79,6 +82,17 @@ class client():
         if testing:
             self.window1['ip'].update('127.0.0.1')
             self.window1['port'].update('6969')
+
+        if os.path.exists(cred_file):
+            with open(cred_file, 'r') as f:
+                try:
+                    self.info = eval(f.read())
+                    self.window1['ip'].update(self.info['ip'])
+                    self.window1['port'].update(self.info['port'])
+                    self.window1['name'].update(self.info['name'])
+                    self.window1['save'].update(self.info['save'])
+                except:
+                    pass
 
         self.window2.hide()
 
@@ -175,6 +189,12 @@ class client():
                 if self.event == 'connect' and not self.win2_active:
                     self.info_valid = self.check_server_info()
                     if self.info_valid == 0:
+                        if self.values['save']:
+                            with open(cred_file, 'w') as f:
+                                f.write(str(self.values))
+                        else:
+                            with open(cred_file, 'w') as f:
+                                f.write('')
                         self.conn_valid = self.start_connection()
                         if self.conn_valid == 0:
                             self.win2_active = True
