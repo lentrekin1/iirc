@@ -58,6 +58,9 @@ class user():
 
 class server():
     def __init__(self):
+        self.settings = ['Change server welcome message', 'qwe']
+        self.welcome_msg = 'Welcome to this server'
+        self.server_name = 'test server' #todo let user set this
         self.users = []
         self.recipients = []
         self.main_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -83,11 +86,33 @@ class server():
         self.users.remove(user)
         self.broardcast_message(f"{self.tmp_name} has disconnected.")
 
+    def setup(self):
+        # todo add server options and have admin set options using this function on server start
+        print('-Server Setup-')
+        while True:
+            print('What would you like to change?')
+            menu = [f'{self.settings.index(i) + 1}: {i}' for i in self.settings]
+            menu.append('0: Exit setup and start server')
+            menu = '\n'.join(menu)
+            print(menu)
+            option = None
+            while option == None:
+                option = input('> ')
+                try:
+                    option = int(option) - 1
+                    if  not 0 <= option < len(self.settings):
+                        raise Exception
+                except:
+                    print('Please enter a valid option')
+                    option = None
+                #todo actually implement selecting option and changing it
+
     def handle_user(self, connection):
         myself = threading.local()
         myself.this_user = user(connection)
         self.users.append(myself.this_user)
         try:
+            self.send_message(myself.this_user, self.server_name)
             self.send_message(myself.this_user, f'Connecting to the server @ {self.ip}:{self.port}...')
         except:
             self.handle_dc(myself.this_user)
@@ -104,6 +129,7 @@ class server():
                         f'User {myself.this_user.connection[1][0]} (id = "{myself.this_user.id}") (nickname = "{myself.this_user.name}") has connected.')
                     self.send_message(myself.this_user,
                                       f'You are connected to the server @ {self.ip}:{self.port} as {myself.this_user.name}')
+                    self.send_message(myself.this_user, self.welcome_msg)
                     self.broardcast_message(f'{myself.this_user.name} has connected')
                 else:
                     self.broardcast_message(f'<{myself.this_user.name}>: {self.data}')
@@ -129,4 +155,5 @@ class server():
 
 if __name__ == '__main__':
     main_server = server()
+    main_server.setup()
     main_server.handle_incoming()
