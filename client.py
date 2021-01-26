@@ -28,7 +28,7 @@ all_layouts = {'setup': [[sg.Text(WINDOW_TITLE, text_color='red', key='setup_tit
                          [sg.Text('', size=(WINDOW_SIZE[0], 10), key='setup_error')]],
 
                'main': [[sg.Text(WINDOW_TITLE, text_color='red', key='main_title')],
-                        [sg.DropDown([], key='servers')],
+                        [sg.DropDown([], key='servers', readonly=True, size=(WINDOW_SIZE[0], 1))],
                         [sg.Multiline(size=(WINDOW_SIZE[0], 20), autoscroll=True, disabled=True, key='chatbox')],
                         [sg.Text("Enter your message below:", key='input_banner'), sg.Button('Send message', key='send'), sg.Button('Disconnect', key='dc')],
                         [sg.InputText(key='input')],
@@ -43,6 +43,8 @@ class connection():
         self.messages = []
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.addr = (ip, port)
+        self.connected = False
+        self.dc = True
 
     def connect(self):
         try:
@@ -57,12 +59,10 @@ class connection():
         while True:
             try:
                 self.response = pickle.loads(self.client.recv(BUFFER_SIZE))
-                if not self.server_name:
-                    self.server_name = self.response
             except EOFError:
                 return -3
-            if self.response and self.server_name:
-                self.messages.append(self.response)
+            if self.response:
+                self.server_name = self.response
                 break
             else:
                 return -4
@@ -76,7 +76,7 @@ class connection():
                 sg.PopupAnimated(sg.DEFAULT_BASE64_LOADING_GIF,
                                  time_between_frames=100, message='Connecting...')
             sg.PopupAnimated(None)
-            if len(self.messages) > 0:
+            if self.connected: #len(self.messages) > 0:
                 self.server_conn = threading.Thread(target=self.maintain_connection, args=())
                 self.server_conn.start()
                 return 0
@@ -84,7 +84,7 @@ class connection():
                 return 'The server could not be reached'
         except:
             return traceback.format_exc()
-
+#todo when client connects, connects then disconnects instantly
     def maintain_connection(self):
         watcher = threading.Thread(target=self.watch_for_dc, args=())
         watcher.start()
@@ -93,6 +93,8 @@ class connection():
                 try:
                     curr_msg = pickle.loads(self.client.recv(BUFFER_SIZE))
                 except:
+                    import traceback
+                    traceback.print_exc()
                     self.handle_dc()
                     break
                 if curr_msg and curr_msg != KEEP_ALIVE_CHAR:
@@ -309,24 +311,37 @@ class client():
                     else:
                         with open(cred_file, 'w') as f:
                             f.write('')
-                    self.connections.append(connection(self.values['ip'], self.values['port'], self.values['name']))
+                    self.connections.append(connection(self.values['ip'], int(self.values['port']), self.values['name']))
                     self.conn_valid = self.connections[-1].start_connection()
                     if not self.conn_valid == 0:
                         self.window['setup_error'].update(self.conn_valid)
                         del self.connections[-1]
+                        #todo maybe add return here if connection fails
+                    self.window['servers'].update(values=[c.server_name for c in self.connections])
                 else:
                     self.window['setup_error'].update(self.info_valid)
 
+            if len(self.connections) > 0:
+                self.window['main'].update(disabled=False)
+            else:
+                self.window['main'].update(disabled=True)
+
             if self.window['tabgroup'].get() == 'main':
-                self.window['servers'].update([[c.server_name for c in self.connections]])
+                self.window['servers'].update(values=[c.server_name for c in self.connections])
+                if self.values['servers'] == '':
+                    self.window['servers'].update(set_to_index=0)
+                    self.values['servers'] = [c.server_name for c in self.connections][0]
+                    #self.window['chatbox'].update('\n'.join(self.find_server([c.server_name for c in self.connections][0]).messages))
+
+                self.window['chatbox'].update('\n'.join(self.find_server(self.values['servers']).messages))
 
             #todo continue to rewrite client so client class basicalyl just manages gui and indiv connection objs manage actual connections - user only sees dc when they switch to that server
             if self.window['tabgroup'].get() == 'main' and (self.event == 'dc' or not self.find_server(self.values['servers']).server_conn.is_alive()):
-                self.dc_status = self.dc_server()
+                self.dc_status = self.find_server(self.values['servers']).dc_server()
                 if self.dc_status == 0:
                     if self.event == 'dc':
                         self.window['setup_error'].update('You disconnected from the server')
-                    elif not self.server_conn.is_alive():
+                    elif not self.find_server(self.values['servers']).server_conn.is_alive():
                         self.window['setup_error'].update(
                             'The server most likely crashed and you were disconnected')
                     else:
@@ -334,12 +349,12 @@ class client():
                 else:
                     self.window['main_error'].update(self.dc_status)
             if self.window['tabgroup'].get() == 'main' and self.event == 'send':
-                self.send_status = self.send_msg()
+                self.send_status = self.find_server(self.values['servers']).send_msg(self.values['input'])
                 if self.send_status == 0:
                     pass
                 else:
                     self.window['main_error'].update(self.send_status)
-            self.window['chatbox'].update('\n'.join(self.messages))
+            #self.window['chatbox'].update('\n'.join(self.messages))
 
         self.window.close()
 

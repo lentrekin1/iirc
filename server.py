@@ -70,6 +70,7 @@ class server():
             self.ip = "127.0.0.1"
         self.port = 6969  # random port
         self.main_socket.close()
+        self.setup()
         self.main_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.main_socket.bind((self.ip, self.port))
         self.main_socket.listen()
@@ -89,19 +90,20 @@ class server():
     def setup(self):
         # todo add server options and have admin set options using this function on server start
         print('-Server Setup-')
-        while True:
+        option = None
+        while option is None:
             print('What would you like to change?')
             menu = [f'{self.settings.index(i) + 1}: {i}' for i in self.settings]
             menu.append('0: Exit setup and start server')
             menu = '\n'.join(menu)
             print(menu)
-            option = None
-            while option == None:
+            while option is None:
                 option = input('> ')
                 try:
                     option = int(option) - 1
-                    if  not 0 <= option < len(self.settings):
+                    if  not -1 <= option < len(self.settings):
                         raise Exception
+                    return
                 except:
                     print('Please enter a valid option')
                     option = None
@@ -155,5 +157,4 @@ class server():
 
 if __name__ == '__main__':
     main_server = server()
-    main_server.setup()
     main_server.handle_incoming()
